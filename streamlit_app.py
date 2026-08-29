@@ -1,56 +1,249 @@
 import streamlit as st
 from openai import OpenAI
+from datetime import datetime
 
-# Show title and description.
-st.title("💬 Chatbot")
-st.write(
-    "This is a simple chatbot that uses OpenAI's GPT-3.5 model to generate responses. "
-    "To use this app, you need to provide an OpenAI API key, which you can get [here](https://platform.openai.com/account/api-keys). "
-    "You can also learn how to build this app step by step by [following our tutorial](https://docs.streamlit.io/develop/tutorials/llms/build-conversational-apps)."
+# ──────────────────────────────────────────────
+# 페이지 기본 설정
+# ──────────────────────────────────────────────
+st.set_page_config(
+    page_title="AI 투자 상담사",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# Ask user for their OpenAI API key via `st.text_input`.
-# Alternatively, you can store the API key in `./.streamlit/secrets.toml` and access it
-# via `st.secrets`, see https://docs.streamlit.io/develop/concepts/connections/secrets-management
-openai_api_key = st.text_input("OpenAI API Key", type="password")
-if not openai_api_key:
-    st.info("Please add your OpenAI API key to continue.", icon="🗝️")
-else:
+# ──────────────────────────────────────────────
+# 커스텀 CSS — 전문적인 금융 UI 톤앤매너
+# ──────────────────────────────────────────────
+st.markdown("""
+<style>
+    /* 전체 배경 */
+    .stApp {
+        background: linear-gradient(180deg, #0b1220 0%, #101a2c 100%);
+    }
 
-    # Create an OpenAI client.
+    /* 메인 타이틀 영역 */
+    .hero-header {
+        padding: 28px 32px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #1a2b4d 0%, #0e1730 100%);
+        border: 1px solid rgba(99, 179, 237, 0.25);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+        margin-bottom: 20px;
+    }
+    .hero-title {
+        font-size: 32px;
+        font-weight: 800;
+        background: linear-gradient(90deg, #63b3ed, #90cdf4, #38b2ac);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0;
+    }
+    .hero-subtitle {
+        color: #a0aec0;
+        font-size: 15px;
+        margin-top: 6px;
+    }
+
+    /* 지표 카드 */
+    .metric-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 12px;
+        padding: 14px 16px;
+        text-align: center;
+    }
+    .metric-label {
+        color: #a0aec0;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        color: #e2e8f0;
+        font-size: 18px;
+        font-weight: 700;
+        margin-top: 4px;
+    }
+
+    /* 채팅 메시지 버블 */
+    [data-testid="stChatMessage"] {
+        border-radius: 14px;
+        padding: 4px 6px;
+        margin-bottom: 6px;
+    }
+
+    /* 사이드바 */
+    section[data-testid="stSidebar"] {
+        background: #0e1730;
+        border-right: 1px solid rgba(255,255,255,0.06);
+    }
+    section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
+        color: #90cdf4;
+    }
+
+    /* 경고/디스클레이머 박스 */
+    .disclaimer-box {
+        background: rgba(237, 137, 54, 0.08);
+        border-left: 3px solid #ed8936;
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 12.5px;
+        color: #cbd5e0;
+        margin-top: 16px;
+    }
+
+    /* 입력창 */
+    .stChatInputContainer {
+        border-radius: 12px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ──────────────────────────────────────────────
+# 히어로 헤더
+# ──────────────────────────────────────────────
+st.markdown("""
+<div class="hero-header">
+    <p class="hero-title">📈 AI 투자 상담사</p>
+    <p class="hero-subtitle">GPT 기반 개인 맞춤형 투자 어드바이저 · 시장 분석 · 포트폴리오 전략 상담</p>
+</div>
+""", unsafe_allow_html=True)
+
+# ──────────────────────────────────────────────
+# 사이드바 — API 키 & 투자자 프로필 설정
+# ──────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("## ⚙️ 상담 설정")
+
+    openai_api_key = st.text_input(
+        "OpenAI API Key",
+        type="password",
+        help="https://platform.openai.com/account/api-keys 에서 발급받을 수 있습니다.",
+    )
+
+    st.markdown("---")
+    st.markdown("### 👤 투자자 프로필")
+
+    risk_profile = st.select_slider(
+        "위험 성향",
+        options=["안정형", "안정추구형", "위험중립형", "적극투자형", "공격투자형"],
+        value="위험중립형",
+    )
+
+    horizon = st.radio(
+        "투자 기간",
+        ["단기 (1년 이내)", "중기 (1~3년)", "장기 (3년 이상)"],
+        index=1,
+    )
+
+    market_focus = st.multiselect(
+        "관심 시장",
+        ["국내 주식 (코스피/코스닥)", "미국 주식", "채권", "ETF", "원자재/금", "암호화폐"],
+        default=["국내 주식 (코스피/코스닥)", "미국 주식"],
+    )
+
+    model_choice = st.selectbox(
+        "모델 선택",
+        ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"],
+        index=0,
+    )
+
+    st.markdown("---")
+    if st.button("🗑️ 대화 초기화", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
+
+    st.markdown("""
+    <div class="disclaimer-box">
+        ⚠️ 본 챗봇은 정보 제공 목적이며 투자 자문이 아닙니다.
+        투자 판단과 그 결과에 대한 책임은 투자자 본인에게 있습니다.
+    </div>
+    """, unsafe_allow_html=True)
+
+# ──────────────────────────────────────────────
+# 상단 요약 지표 (프로필 확인용)
+# ──────────────────────────────────────────────
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.markdown(f"""<div class="metric-card"><div class="metric-label">위험 성향</div>
+    <div class="metric-value">{risk_profile}</div></div>""", unsafe_allow_html=True)
+with col2:
+    st.markdown(f"""<div class="metric-card"><div class="metric-label">투자 기간</div>
+    <div class="metric-value">{horizon.split(" ")[0]}</div></div>""", unsafe_allow_html=True)
+with col3:
+    st.markdown(f"""<div class="metric-card"><div class="metric-label">관심 시장</div>
+    <div class="metric-value">{len(market_focus)}개 선택</div></div>""", unsafe_allow_html=True)
+with col4:
+    st.markdown(f"""<div class="metric-card"><div class="metric-label">오늘 날짜</div>
+    <div class="metric-value">{datetime.now().strftime("%Y-%m-%d")}</div></div>""", unsafe_allow_html=True)
+
+st.write("")
+
+# ──────────────────────────────────────────────
+# API 키 미입력 시 안내
+# ──────────────────────────────────────────────
+if not openai_api_key:
+    st.info("👈 왼쪽 사이드바에 OpenAI API 키를 입력하면 상담을 시작할 수 있습니다.", icon="🗝️")
+else:
     client = OpenAI(api_key=openai_api_key)
 
-    # Create a session state variable to store the chat messages. This ensures that the
-    # messages persist across reruns.
+    # 투자 상담사 페르소나 시스템 프롬프트 (프로필 반영)
+    system_prompt = f"""당신은 신중하고 전문적인 금융/투자 상담 AI입니다.
+사용자의 투자 성향은 '{risk_profile}', 투자 기간은 '{horizon}', 관심 시장은 '{", ".join(market_focus) if market_focus else "미지정"}'입니다.
+이 프로필을 참고하여 답변하되, 다음 원칙을 지키세요:
+1. 특정 종목의 '매수/매도'를 단정적으로 지시하지 말고, 근거와 리스크를 함께 제시할 것
+2. 데이터나 최신 시황을 알 수 없는 경우 그 한계를 명확히 밝힐 것
+3. 항상 분산투자, 리스크 관리의 중요성을 상기시킬 것
+4. 답변은 한국어로, 이해하기 쉽되 전문 용어는 간단히 풀어서 설명할 것
+5. 확정적인 수익 예측이나 보장을 하지 말 것
+6. 이 상담은 정보 제공 목적이며 법적 투자자문이 아님을 필요시 안내할 것
+"""
+
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Display the existing chat messages via `st.chat_message`.
+    # 기존 대화 표시
     for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
+        avatar = "🧑‍💼" if message["role"] == "user" else "📊"
+        with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
 
-    # Create a chat input field to allow the user to enter a message. This will display
-    # automatically at the bottom of the page.
-    if prompt := st.chat_input("What is up?"):
+    # 대화가 없을 때 예시 질문 제시
+    if not st.session_state.messages:
+        st.markdown("##### 💡 이런 질문으로 시작해보세요")
+        example_cols = st.columns(3)
+        examples = [
+            "지금 제 성향에 맞는 자산배분 전략을 알려줘",
+            "코스피 변동성이 클 때 리밸런싱은 어떻게 해야 해?",
+            "ETF와 개별주 투자의 장단점을 비교해줘",
+        ]
+        clicked = None
+        for c, ex in zip(example_cols, examples):
+            with c:
+                if st.button(ex, use_container_width=True):
+                    clicked = ex
+        if clicked:
+            st.session_state.messages.append({"role": "user", "content": clicked})
+            st.rerun()
 
-        # Store and display the current prompt.
+    # 채팅 입력
+    if prompt := st.chat_input("투자 관련 질문을 입력하세요 (예: 지금 채권 비중을 늘려야 할까요?)"):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
+        with st.chat_message("user", avatar="🧑‍💼"):
             st.markdown(prompt)
 
-        # Generate a response using the OpenAI API.
-        stream = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
-            stream=True,
-        )
-
-        # Stream the response to the chat using `st.write_stream`, then store it in 
-        # session state.
-        with st.chat_message("assistant"):
+        with st.chat_message("assistant", avatar="📊"):
+            stream = client.chat.completions.create(
+                model=model_choice,
+                messages=[{"role": "system", "content": system_prompt}]
+                + [
+                    {"role": m["role"], "content": m["content"]}
+                    for m in st.session_state.messages
+                ],
+                stream=True,
+                temperature=0.4,
+            )
             response = st.write_stream(stream)
+
         st.session_state.messages.append({"role": "assistant", "content": response})
