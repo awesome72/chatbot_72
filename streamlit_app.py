@@ -17,9 +17,20 @@ st.set_page_config(
 # ──────────────────────────────────────────────
 st.markdown("""
 <style>
-    /* 전체 배경 */
+    /* 전체 배경 & 기본 텍스트 */
     .stApp {
         background: linear-gradient(180deg, #0b1220 0%, #101a2c 100%);
+    }
+    html, body, [class*="css"] {
+        font-size: 16px;
+        line-height: 1.65;
+    }
+    /* 본문 전반의 텍스트 색상을 밝게 — 가독성 강화 */
+    .stMarkdown, .stMarkdown p, .stMarkdown li,
+    [data-testid="stChatMessageContent"], [data-testid="stChatMessageContent"] p {
+        color: #f5f7fa !important;
+        font-size: 16.5px !important;
+        line-height: 1.7 !important;
     }
 
     /* 메인 타이틀 영역 */
@@ -27,75 +38,105 @@ st.markdown("""
         padding: 28px 32px;
         border-radius: 16px;
         background: linear-gradient(135deg, #1a2b4d 0%, #0e1730 100%);
-        border: 1px solid rgba(99, 179, 237, 0.25);
+        border: 1px solid rgba(99, 179, 237, 0.35);
         box-shadow: 0 8px 24px rgba(0,0,0,0.35);
         margin-bottom: 20px;
     }
     .hero-title {
-        font-size: 32px;
+        font-size: 34px;
         font-weight: 800;
-        background: linear-gradient(90deg, #63b3ed, #90cdf4, #38b2ac);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        color: #ffffff;
         margin: 0;
+        text-shadow: 0 1px 12px rgba(99,179,237,0.35);
     }
     .hero-subtitle {
-        color: #a0aec0;
-        font-size: 15px;
-        margin-top: 6px;
+        color: #d7dee8;
+        font-size: 16px;
+        font-weight: 500;
+        margin-top: 8px;
     }
 
     /* 지표 카드 */
     .metric-card {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.14);
         border-radius: 12px;
         padding: 14px 16px;
         text-align: center;
     }
     .metric-label {
-        color: #a0aec0;
-        font-size: 12px;
+        color: #cbd5e0;
+        font-size: 12.5px;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.06em;
     }
     .metric-value {
-        color: #e2e8f0;
-        font-size: 18px;
-        font-weight: 700;
+        color: #ffffff;
+        font-size: 20px;
+        font-weight: 800;
         margin-top: 4px;
     }
 
-    /* 채팅 메시지 버블 */
+    /* 채팅 메시지 버블 — 배경을 넣어 텍스트와 대비를 확실히 */
     [data-testid="stChatMessage"] {
         border-radius: 14px;
-        padding: 4px 6px;
-        margin-bottom: 6px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+        background: rgba(255,255,255,0.045);
+        border: 1px solid rgba(255,255,255,0.09);
+    }
+    [data-testid="stChatMessageContent"] strong {
+        color: #90cdf4;
+    }
+    [data-testid="stChatMessageContent"] code {
+        color: #f6ad55;
+        background: rgba(255,255,255,0.08);
     }
 
     /* 사이드바 */
     section[data-testid="stSidebar"] {
         background: #0e1730;
-        border-right: 1px solid rgba(255,255,255,0.06);
+        border-right: 1px solid rgba(255,255,255,0.08);
     }
     section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
         color: #90cdf4;
+        font-weight: 800;
+    }
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span {
+        color: #eef2f7 !important;
+        font-size: 15px !important;
+        font-weight: 500;
+    }
+
+    /* 예시 질문 버튼 및 일반 버튼 텍스트 */
+    .stButton button {
+        color: #f5f7fa !important;
+        font-weight: 600 !important;
+        border: 1px solid rgba(255,255,255,0.16) !important;
     }
 
     /* 경고/디스클레이머 박스 */
     .disclaimer-box {
-        background: rgba(237, 137, 54, 0.08);
+        background: rgba(237, 137, 54, 0.12);
         border-left: 3px solid #ed8936;
         border-radius: 8px;
         padding: 10px 14px;
-        font-size: 12.5px;
-        color: #cbd5e0;
+        font-size: 13.5px;
+        font-weight: 500;
+        color: #ffe8cf;
         margin-top: 16px;
     }
 
     /* 입력창 */
     .stChatInputContainer {
         border-radius: 12px;
+    }
+    [data-testid="stChatInput"] textarea {
+        color: #f5f7fa !important;
+        font-size: 16px !important;
     }
 </style>
 """, unsafe_allow_html=True)
