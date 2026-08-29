@@ -204,6 +204,71 @@ def render_tts_button(text: str, key: str, rate: float = 1.0, autoplay: bool = F
 
 
 # ──────────────────────────────────────────────
+# 카카오톡 공유 기능 (Kakao JavaScript SDK 사용)
+# ──────────────────────────────────────────────
+def render_kakao_share_button(text: str, key: str, kakao_js_key: str, share_link: str):
+    """assistant 답변을 카카오톡으로 공유하는 버튼을 렌더링한다.
+    Kakao Developers에서 발급받은 JavaScript 키와, 해당 앱에 등록된 도메인이 필요하다.
+    """
+    if not kakao_js_key:
+        st.caption("🗨️ 카카오톡 공유를 사용하려면 사이드바에 카카오 JavaScript 키를 입력하세요.")
+        return
+
+    # 카카오톡 피드 템플릿은 텍스트 길이 제한이 있으므로 너무 긴 답변은 잘라서 전송
+    max_len = 300
+    share_text = text if len(text) <= max_len else text[:max_len] + "…"
+    text_json = json.dumps(share_text)
+    key_json = json.dumps(kakao_js_key)
+    link_json = json.dumps(share_link or "https://developers.kakao.com")
+
+    html_code = f"""
+    <div style="display:flex; align-items:center; gap:8px; margin: 2px 0 12px 0; font-family: sans-serif;">
+      <button id="kakao-{key}" onclick="shareKakao()" style="
+          background: rgba(254,229,0,0.15);
+          color:#fee500;
+          border:1px solid rgba(254,229,0,0.5);
+          border-radius:8px;
+          padding:5px 12px;
+          font-size:13px;
+          font-weight:600;
+          cursor:pointer;
+      ">🗨️ 카카오톡 공유</button>
+      <span id="kakao-status-{key}" style="color:#a0aec0; font-size:12px;"></span>
+    </div>
+    <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js"></script>
+    <script>
+      (function() {{
+        const appKey_{key} = {key_json};
+        const shareText_{key} = {text_json};
+        const shareLink_{key} = {link_json};
+        try {{
+          if (window.Kakao && !window.Kakao.isInitialized()) {{
+            window.Kakao.init(appKey_{key});
+          }}
+        }} catch (e) {{
+          document.getElementById('kakao-status-{key}').innerText = '카카오 SDK 초기화 실패';
+        }}
+        window.shareKakao = function() {{
+          if (!window.Kakao || !window.Kakao.isInitialized()) {{
+            document.getElementById('kakao-status-{key}').innerText = '카카오 키를 확인해주세요.';
+            return;
+          }}
+          window.Kakao.Share.sendDefault({{
+            objectType: 'text',
+            text: shareText_{key},
+            link: {{
+              mobileWebUrl: shareLink_{key},
+              webUrl: shareLink_{key}
+            }}
+          }});
+        }};
+      }})();
+    </script>
+    """
+    components.html(html_code, height=40)
+
+
+# ──────────────────────────────────────────────
 # 히어로 헤더
 # ──────────────────────────────────────────────
 st.markdown("""
@@ -256,6 +321,23 @@ with st.sidebar:
     st.markdown("### 🔊 음성 읽기")
     auto_read = st.toggle("답변 자동으로 읽어주기", value=False)
     speech_rate = st.slider("읽는 속도", min_value=0.5, max_value=1.5, value=1.0, step=0.1)
+
+    st.markdown("---")
+    st.markdown("### 🗨️ 카카오톡 공유")
+    kakao_js_key = st.text_input(
+        "카카오 JavaScript 키",
+        type="password",
+        help=(
+            "Kakao Developers(developers.kakao.com)에서 앱을 생성한 뒤 "
+            "'앱 키 > JavaScript 키'를 입력하세요. 앱의 '플랫폼 > Web'에 "
+            "이 페이지가 열리는 도메인(예: http://localhost:8501)을 등록해야 정상 작동합니다."
+        ),
+    )
+    kakao_share_link = st.text_input(
+        "공유 시 포함할 링크 (선택)",
+        placeholder="https://your-app-url.com",
+        help="카카오톡 메시지에 함께 표시될 링크입니다. 비워두면 기본 링크가 사용됩니다.",
+    )
 
     st.markdown("---")
     if st.button("🗑️ 대화 초기화", use_container_width=True):
@@ -318,6 +400,10 @@ else:
             st.markdown(message["content"])
             if message["role"] == "assistant":
                 render_tts_button(message["content"], key=f"hist_{idx}", rate=speech_rate)
+                render_kakao_share_button(
+                    message["content"], key=f"hist_{idx}",
+                    kakao_js_key=kakao_js_key, share_link=kakao_share_link,
+                )
 
     # 대화가 없을 때 예시 질문 제시
     if not st.session_state.messages:
@@ -360,6 +446,12 @@ else:
                 key=f"live_{len(st.session_state.messages)}",
                 rate=speech_rate,
                 autoplay=auto_read,
+            )
+            render_kakao_share_button(
+                response,
+                key=f"live_{len(st.session_state.messages)}",
+                kakao_js_key=kakao_js_key,
+                share_link=kakao_share_link,
             )
 
         st.session_state.messages.append({"role": "assistant", "content": response})
