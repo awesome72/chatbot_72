@@ -1,6 +1,8 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from openai import OpenAI
 from datetime import datetime
+import json
 
 # ──────────────────────────────────────────────
 # 페이지 기본 설정
@@ -142,6 +144,66 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────
+# 음성 읽어주기 기능 (브라우저 내장 TTS 사용 — 추가 비용 없음)
+# ──────────────────────────────────────────────
+def render_tts_button(text: str, key: str, rate: float = 1.0, autoplay: bool = False):
+    """assistant 답변 아래에 '읽어주기 / 정지' 버튼을 렌더링한다.
+    브라우저의 Web Speech API(SpeechSynthesis)를 사용하므로 별도 API 호출이나 비용이 들지 않는다.
+    """
+    text_json = json.dumps(text)  # 따옴표/줄바꿈 등을 안전하게 이스케이프
+    autoplay_js = "speakNow();" if autoplay else ""
+    html_code = f"""
+    <div style="display:flex; align-items:center; gap:8px; margin: 2px 0 10px 0; font-family: sans-serif;">
+      <button id="play-{key}" onclick="speakNow()" style="
+          background: rgba(99,179,237,0.15);
+          color:#90cdf4;
+          border:1px solid rgba(99,179,237,0.4);
+          border-radius:8px;
+          padding:5px 12px;
+          font-size:13px;
+          font-weight:600;
+          cursor:pointer;
+      ">🔊 읽어주기</button>
+      <button id="stop-{key}" onclick="stopNow()" style="
+          background: rgba(255,255,255,0.06);
+          color:#cbd5e0;
+          border:1px solid rgba(255,255,255,0.16);
+          border-radius:8px;
+          padding:5px 12px;
+          font-size:13px;
+          font-weight:600;
+          cursor:pointer;
+      ">⏹ 정지</button>
+      <span id="status-{key}" style="color:#a0aec0; font-size:12px;"></span>
+    </div>
+    <script>
+      const ttsText_{key} = {text_json};
+      function speakNow() {{
+        if (!window.speechSynthesis) {{
+          document.getElementById('status-{key}').innerText = '이 브라우저는 음성 읽기를 지원하지 않습니다.';
+          return;
+        }}
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(ttsText_{key});
+        utter.lang = 'ko-KR';
+        utter.rate = {rate};
+        utter.onstart = () => document.getElementById('status-{key}').innerText = '재생 중...';
+        utter.onend = () => document.getElementById('status-{key}').innerText = '';
+        window.speechSynthesis.speak(utter);
+      }}
+      function stopNow() {{
+        if (window.speechSynthesis) {{
+          window.speechSynthesis.cancel();
+          document.getElementById('status-{key}').innerText = '';
+        }}
+      }}
+      {autoplay_js}
+    </script>
+    """
+    components.html(html_code, height=40)
+
+
+# ──────────────────────────────────────────────
 # 히어로 헤더
 # ──────────────────────────────────────────────
 st.markdown("""
@@ -189,6 +251,11 @@ with st.sidebar:
         ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"],
         index=0,
     )
+
+    st.markdown("---")
+    st.markdown("### 🔊 음성 읽기")
+    auto_read = st.toggle("답변 자동으로 읽어주기", value=False)
+    speech_rate = st.slider("읽는 속도", min_value=0.5, max_value=1.5, value=1.0, step=0.1)
 
     st.markdown("---")
     if st.button("🗑️ 대화 초기화", use_container_width=True):
@@ -245,10 +312,12 @@ else:
         st.session_state.messages = []
 
     # 기존 대화 표시
-    for message in st.session_state.messages:
+    for idx, message in enumerate(st.session_state.messages):
         avatar = "🧑‍💼" if message["role"] == "user" else "📊"
         with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
+            if message["role"] == "assistant":
+                render_tts_button(message["content"], key=f"hist_{idx}", rate=speech_rate)
 
     # 대화가 없을 때 예시 질문 제시
     if not st.session_state.messages:
@@ -286,5 +355,11 @@ else:
                 temperature=0.4,
             )
             response = st.write_stream(stream)
+            render_tts_button(
+                response,
+                key=f"live_{len(st.session_state.messages)}",
+                rate=speech_rate,
+                autoplay=auto_read,
+            )
 
         st.session_state.messages.append({"role": "assistant", "content": response})
